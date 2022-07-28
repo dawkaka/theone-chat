@@ -51,13 +51,23 @@ couple.use(async (socket, next) => {
     next()
   } else {
     try {
-      const user = await axios.get(`${process.env.GoServer!}/user/session`, { withCredentials: true }) as User
+      //cookie will be used to get user sessions if it exists (user is logged in)
+      var headers = {
+        'Cookie': socket.handshake.headers.cookie || ""
+      };
+
+      const user = await axios.get(
+        `${process.env.GoServer!}/user/session`,
+        { withCredentials: true, headers: headers }
+      ) as User
+
       if (user.hasPartner) {
         socket.handshake.auth.user = user
         next()
       } else {
         next(new Error("Doesn't have a partner"))
       }
+
     } catch (error) {
       const err = new Error("Not authorized");
       next(err);
