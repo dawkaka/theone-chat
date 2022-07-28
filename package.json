@@ -11,7 +11,10 @@
   "license": "ISC",
   "dependencies": {
     "@socket.io/redis-adapter": "^7.2.0",
+    "aws-sdk": "^2.1182.0",
     "axios": "^0.27.2",
+    "dotenv": "^16.0.1",
+    "joi": "^17.6.0",
     "mongodb": "^4.8.1",
     "mongoose": "^6.4.7",
     "redis": "^4.2.0",
@@ -19,5 +22,9 @@
   },
   "devDependencies": {
     "typescript": "^4.7.4"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.0.6",
+    "utf-8-validate": "^5.0.9"
   }
 }
