@@ -14,7 +14,7 @@ dotenv.config()
 const io = new Server();
 const pubClient = createClient({ url: "redis://localhost:6379" });
 const subClient = pubClient.duplicate();
-
+console.log(pubClient)
 
 interface User {
   hasPartner: boolean,
@@ -143,16 +143,6 @@ couple.on("connection", socket => {
   })
 
 })
-
-
-
-
-
-
-
-
-
-
 
 
 

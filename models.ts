@@ -32,4 +32,4 @@ const GroupMessages = new Schema({
     contentType: String,
 })
 
-export const groupMessageModel = mongoose.model("group-message")
+export const groupMessageModel = mongoose.model("group-message", GroupMessages)
