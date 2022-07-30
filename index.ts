@@ -12,7 +12,7 @@ import { coupleMessageModel, groupMessageModel } from "./models"
 
 dotenv.config()
 const io = new Server();
-const pubClient = createClient({ url: "redis://localhost:6379" });
+const pubClient = createClient({ url: process.env.RedisServer });
 const subClient = pubClient.duplicate();
 console.log(pubClient)
 
@@ -69,6 +69,7 @@ couple.use(async (socket, next) => {
       }
 
     } catch (error) {
+      console.log(error)
       const err = new Error("Not authorized");
       next(err);
     }
@@ -153,11 +154,6 @@ couple.on("connection", socket => {
   })
 
 })
-
-
-
-
-
 
 
 
@@ -272,5 +268,11 @@ coupleAndUser.on("connection", socket => {
 
 })
 
-io.adapter(createAdapter(pubClient, subClient));
-io.listen(3000)
+//io.adapter(createAdapter(pubClient, subClient));
+
+Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+  io.adapter(createAdapter(pubClient, subClient));
+  io.listen(3000);
+}).catch(error => {
+  console.log(error)
+});
