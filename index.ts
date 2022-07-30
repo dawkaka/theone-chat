@@ -268,8 +268,6 @@ coupleAndUser.on("connection", socket => {
 
 })
 
-//io.adapter(createAdapter(pubClient, subClient));
-
 Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
   io.adapter(createAdapter(pubClient, subClient));
   io.listen(3000);
