@@ -6,13 +6,14 @@ import axios from 'axios';
 import { ManagedUpload } from "aws-sdk/clients/s3";
 import Joi from "joi"
 
+dotenv.config()
+
+
 import s3 from "./aws";
 import { coupleMessageModel, groupMessageModel } from "./models"
 
-
-dotenv.config()
 const io = new Server();
-const pubClient = createClient({ url: process.env.RedisServer });
+const pubClient = createClient({ url: process.env.REDIS_SERVER });
 const subClient = pubClient.duplicate();
 console.log(pubClient)
 
@@ -47,7 +48,9 @@ const fileMessageSchema = Joi.object({
 //Namespace for messages between couple
 const couple = io.of("/couple")
 couple.use(async (socket, next) => {
+  console.log(socket.data.coupleId, socket.handshake.auth?.coupleId)
   if (socket.handshake.auth.user) {
+    console.log('here')
     next()
   } else {
     try {
@@ -77,16 +80,17 @@ couple.use(async (socket, next) => {
 });
 
 couple.on("connection", socket => {
-  const coupleId = socket.handshake.auth.user.couple_id
+  const coupleId = socket.handshake.auth.coupleId
   const userId = socket.handshake.auth.user.id
   const partnerId = socket.handshake.auth.user.partnerId
   socket.join([coupleId, userId])
 
   socket.on("text-message", async (message: MessageData) => {
+    console.log(message)
     const from = userId
     const to = partnerId
     const date = new Date()
-    const { error, value } = textMessageSchema.validate(message);
+    const { error, value } = textMessageSchema.validate({ message });
     if (error) {
       couple.in(from).emit("not-sent", error.message)
       return
@@ -102,9 +106,10 @@ couple.on("connection", socket => {
         type: "text"
       })
       await newMessage.save()
-      socket.to(coupleId).emit("message", { type: "file", date, message })
-    } catch (error) {
-      couple.in(from).emit("not-sent")
+      socket.to(coupleId).emit("message", { type: "text", date, message })
+      couple.in(from).emit("message", { type: "text", date, message })
+    } catch (error: any) {
+      couple.in(from).emit("not-sent", error.message)
     }
   })
 
