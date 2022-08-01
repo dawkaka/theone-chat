@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const url = new URL(process.env.MONGO_DB as string).toString()
+const url = new URL(process.env.MONGO_DB!).toString()
 console.log(url)
 mongoose.connect(url)
 

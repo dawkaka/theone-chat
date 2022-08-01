@@ -8,7 +8,6 @@ import Joi from "joi"
 
 dotenv.config()
 
-
 import s3 from "./aws";
 import { coupleMessageModel, groupMessageModel } from "./models"
 
@@ -54,16 +53,11 @@ couple.use(async (socket, next) => {
     next()
   } else {
     try {
-      //cookie will be used to get user sessions if it exists (user is logged in)
+      //cookie will be used to get user sessions if it exists (if user is logged in)
       var headers = {
         'Cookie': socket.handshake.headers.cookie || ""
-      };
-
-      const user = await axios.get(
-        `${process.env.GoServer!}/user/session`,
-        { withCredentials: true, headers: headers }
-      ) as User
-
+      }
+      const user = await axios.get(`${process.env.GoServer!}/user/session`, { withCredentials: true, headers: headers }) as User
       if (user.hasPartner) {
         socket.handshake.auth.user = user
         next()
@@ -105,11 +99,13 @@ couple.on("connection", socket => {
         recieved: false,
         type: "text"
       })
-      await newMessage.save()
-      socket.to(coupleId).emit("message", { type: "text", date, message })
-      couple.in(from).emit("message", { type: "text", date, message })
+      const res = await newMessage.save()
+      socket.to(coupleId).emit("message", { type: "text", date, message, messageId: res.id })
+      //  socket.in(from).emit("message", { type: "text", date, message })
+      socket.in(from).emit("sent", res.id)
+
     } catch (error: any) {
-      couple.in(from).emit("not-sent", error.message)
+      socket.in(from).emit("not-sent", error.message)
     }
   })
 
@@ -146,16 +142,26 @@ couple.on("connection", socket => {
           message: key,
           contentType: "image/" + contentType
         })
-        await newMessage.save()
-        socket.to(coupleId).emit("message", { type: "file", date, message: key, caption })
+        const res = await newMessage.save()
+        socket.to(coupleId).emit("message", { type: "file", date, message: key, caption, messageId: res.id })
+        socket.in(from).emit("sent", res.id)
       } catch (error) {
         couple.in(from).emit("not-sent")
       }
     })
   })
 
-  socket.on("is-typing", data => {
-    couple.to(coupleId).emit("is-typing", data)
+  socket.on("recieved", async messageId => {
+    try {
+      await coupleMessageModel.findByIdAndUpdate(messageId, { $set: { recieved: true } })
+      socket.to(coupleId).emit("recieved", messageId)
+    } catch (error) {
+      console.log(error)
+    }
+  })
+
+  socket.on("typing", isTyping => {
+    socket.to(coupleId).emit("typing", isTyping)
   })
 
 })
@@ -166,7 +172,7 @@ couple.on("connection", socket => {
 const coupleAndUser = io.of("/couple-and-user")
 coupleAndUser.use(async (socket, next) => {
   try {
-    const user = await axios.get(`${process.env.GoServer!}/user/session`, { withCredentials: true }) as User
+    const user = await axios.get(`${process.env.GO_SERVER!}/user/session`, { withCredentials: true }) as User
     socket.handshake.auth.user = user
     next()
   } catch (error) {
@@ -211,8 +217,9 @@ coupleAndUser.on("connection", socket => {
         type: "text",
         afrom: user.id
       })
-      await newMessage.save()
-      couple.to(room).emit("message", { type: "file", date, message })
+      const res = await newMessage.save()
+      socket.to(room).emit("message", { type: "file", date, message, messageId: res.id })
+      socket.in(from).emit("sent", res.id)
     } catch (error) {
       couple.in(from).emit("not-sent", error)
     }
@@ -259,18 +266,27 @@ coupleAndUser.on("connection", socket => {
           contentType: "image/" + contentType,
           afrom: user.id
         })
-        await newMessage.save()
-        couple.to(room).emit("message", { type: "file", date, message: key, caption })
+        const res = await newMessage.save()
+        socket.to(room).emit("message", { type: "file", date, message: key, caption, messageId: res.id })
+        socket.in(from).emit("sent", res.id)
       } catch (error) {
         couple.in(from).emit("not-sent", "something went wrong")
       }
     })
   })
 
-  socket.on("is-typing", data => {
-    couple.to(room).emit("is-typing", data)
+  socket.on("recieved", async messageId => {
+    try {
+      await groupMessageModel.findByIdAndUpdate(messageId, { $set: { recieved: true } })
+      socket.to(room).emit("recieved", messageId)
+    } catch (error) {
+      console.log(error)
+    }
   })
 
+  socket.on("typing", isTyping => {
+    couple.to(room).emit("typing", isTyping)
+  })
 })
 
 Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
