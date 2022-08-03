@@ -35,7 +35,6 @@ type FileMessage = {
   caption: string
 }
 
-
 const textMessageSchema = Joi.object({
   message: Joi.string().max(256).required(),
 });
