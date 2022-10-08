@@ -90,20 +90,22 @@ couple.on("connection", socket => {
     }
     try {
       const newMessage = new coupleMessageModel({
-        date,
         from,
         to,
-        coupleId,
-        message: message.message,
+        type: "text",
+        message: message,
+        date: new Date(),
+        couple_id: coupleId,
         recieved: false,
-        type: "text"
       })
       const res = await newMessage.save()
+      console.log(res)
       socket.to(coupleId).emit("message", { type: "text", date, message, messageId: res.id })
       //  socket.in(from).emit("message", { type: "text", date, message })
       socket.in(from).emit("sent", res.id)
 
     } catch (error: any) {
+      console.log(error)
       socket.in(from).emit("not-sent", error.message)
     }
   })
@@ -290,7 +292,7 @@ coupleAndUser.on("connection", socket => {
 
 Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
   io.adapter(createAdapter(pubClient, subClient));
-  io.listen(3000);
+  io.listen(4000);
 }).catch(error => {
   console.log(error)
 });

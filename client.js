@@ -1,6 +1,6 @@
 const {io} = require("socket.io-client");
 
-const socket = io("ws://localhost:3000/couple");
+const socket = io("ws://localhost:4000/couple");
 
 socket.on('connect', () => {
     console.log('Connected to the server')
@@ -23,7 +23,6 @@ for(let i = 0; i < 100; i++) {
 
 
 socket.on("connect_error", (error) => {
-    console.log(error.message)
-    socket.auth = {user: {id:"brow"}, coupleId:"whatbamaa"};
+    socket.auth = {user: {id:"63418496b2458f195b3b91ec", partnerId:"63418496b2458f195b3b91ec"}, coupleId:"63418496b2458f195b3b91ec"};
     socket.connect();
   });
