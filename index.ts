@@ -2,7 +2,7 @@ import { Server } from "socket.io"
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
 import dotenv from "dotenv";
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { ManagedUpload } from "aws-sdk/clients/s3";
 import Joi from "joi"
 import express from "express"
@@ -67,7 +67,6 @@ couple.use(async (socket, next) => {
         'Cookie': socket.handshake.headers.cookie || ""
       }
       const user = await axios.get(`${process.env.GO_SERVER!}/user/u/session`, { withCredentials: true, headers: headers }) as { data: { session: User } }
-      console.log(user)
       if (user.data.session.has_partner) {
         socket.handshake.auth.user = user.data.session
         next()
@@ -76,7 +75,7 @@ couple.use(async (socket, next) => {
       }
     } catch (error) {
       console.log(error)
-      const err = new Error("Not authorized");
+      const err = new Error("Got you");
       next(err);
     }
   }
@@ -86,7 +85,6 @@ couple.on("connection", socket => {
   const coupleId = socket.handshake.auth.user.couple_id
   const userId = socket.handshake.auth.user.id
   const partnerId = socket.handshake.auth.user.partner_id
-  console.log(coupleId, userId, partnerId)
   socket.join([coupleId, userId])
 
   socket.on("text-message", async (message: MessageData) => {
@@ -118,44 +116,41 @@ couple.on("connection", socket => {
     }
   })
 
-  socket.on("file-message", async ({ caption, file, contentType }: FileMessage) => {
+  socket.on("file-message", async (file: any) => {
     const from = userId
     const to = partnerId
-    const { error } = fileMessageSchema.validate({ caption, contentType })
-    if (error) {
-      couple.in(from).emit("not-sent", error.message)
-      return
-    }
     const date = new Date()
-    const key = from + "_" + Date.now() + "." + contentType
+    const key = from + "_" + Date.now() + ".jpg"
+    console.log(file)
     const params = {
-      Bucket: "messages",
+      Bucket: "theone-profile-images",
       Key: key, // File name; to save as in S3
       Body: file,
-      ContentType: "image/" + contentType,
+      ContentType: "image/jpg",
+      ACL: "public-read",
     };
+
     s3.upload(params, async (err: Error, data: ManagedUpload.SendData) => {
       if (err) {
-        couple.to(from).emit("not-sent")
+        couple.to(from).emit("not-sent", err)
         return
       }
+      console.log(data)
       try {
         const newMessage = new coupleMessageModel({
-          caption,
           date,
           from,
           to,
-          coupleId,
+          couple_id: coupleId,
           recieved: false,
           type: "file",
           message: key,
-          contentType: "image/" + contentType
         })
         const res = await newMessage.save()
-        socket.to(coupleId).emit("message", { type: "file", date, message: key, caption, messageId: res.id })
-        socket.in(from).emit("sent", res.id)
+        socket.to(to).emit("message", res)
+        socket.to(from).emit("sent", res.id)
       } catch (error) {
-        couple.in(from).emit("not-sent")
+        couple.in(from).emit("not-sent", error)
       }
     })
   })
@@ -169,8 +164,12 @@ couple.on("connection", socket => {
     }
   })
 
-  socket.on("typing", isTyping => {
-    socket.to(coupleId).emit("typing", isTyping)
+  socket.on("typing", () => {
+    socket.to(partnerId).emit("typing")
+  })
+
+  socket.on("not-typing", isTyping => {
+    socket.to(partnerId).emit("not-typing")
   })
 
 })
