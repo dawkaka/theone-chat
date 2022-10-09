@@ -91,11 +91,6 @@ couple.on("connection", socket => {
     const from = userId
     const to = partnerId
     const date = new Date()
-    const { error, value } = textMessageSchema.validate({ message });
-    if (error) {
-      couple.in(from).emit("not-sent", error.message)
-      return
-    }
     try {
       const newMessage = new coupleMessageModel({
         from,
