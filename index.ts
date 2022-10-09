@@ -1,29 +1,41 @@
-import { Server } from "socket.io";
+import { Server } from "socket.io"
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
 import dotenv from "dotenv";
 import axios from 'axios';
 import { ManagedUpload } from "aws-sdk/clients/s3";
 import Joi from "joi"
+import express from "express"
+import http from "http";
+
+const app = express();
+const server = http.createServer(app);
 
 dotenv.config()
 
 import s3 from "./aws";
 import { coupleMessageModel, groupMessageModel } from "./models"
 
-const io = new Server();
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+    allowedHeaders: ["my-custom-header"],
+    credentials: true
+  }
+});
+
 const pubClient = createClient({ url: process.env.REDIS_SERVER });
 const subClient = pubClient.duplicate();
-console.log(pubClient)
 
 interface User {
-  hasPartner: boolean,
+  has_partner: boolean,
   couple_id: string,
   id: string,
-  partnerId: string,
+  partner_id: string,
   name: string;
-  firstName: string,
-  lastName: string
+  first_name: string,
+  last_name: string
 }
 
 type MessageData = {
@@ -46,9 +58,7 @@ const fileMessageSchema = Joi.object({
 //Namespace for messages between couple
 const couple = io.of("/couple")
 couple.use(async (socket, next) => {
-  console.log(socket.data.coupleId, socket.handshake.auth?.coupleId)
   if (socket.handshake.auth.user) {
-    console.log('here')
     next()
   } else {
     try {
@@ -56,14 +66,14 @@ couple.use(async (socket, next) => {
       var headers = {
         'Cookie': socket.handshake.headers.cookie || ""
       }
-      const user = await axios.get(`${process.env.GoServer!}/user/session`, { withCredentials: true, headers: headers }) as User
-      if (user.hasPartner) {
-        socket.handshake.auth.user = user
+      const user = await axios.get(`${process.env.GO_SERVER!}/user/u/session`, { withCredentials: true, headers: headers }) as { data: { session: User } }
+      console.log(user)
+      if (user.data.session.has_partner) {
+        socket.handshake.auth.user = user.data.session
         next()
       } else {
         next(new Error("Doesn't have a partner"))
       }
-
     } catch (error) {
       console.log(error)
       const err = new Error("Not authorized");
@@ -73,13 +83,13 @@ couple.use(async (socket, next) => {
 });
 
 couple.on("connection", socket => {
-  const coupleId = socket.handshake.auth.coupleId
+  const coupleId = socket.handshake.auth.user.couple_id
   const userId = socket.handshake.auth.user.id
-  const partnerId = socket.handshake.auth.user.partnerId
+  const partnerId = socket.handshake.auth.user.partner_id
+  console.log(coupleId, userId, partnerId)
   socket.join([coupleId, userId])
 
   socket.on("text-message", async (message: MessageData) => {
-    console.log(message)
     const from = userId
     const to = partnerId
     const date = new Date()
@@ -99,10 +109,8 @@ couple.on("connection", socket => {
         recieved: false,
       })
       const res = await newMessage.save()
-      console.log(res)
-      socket.to(coupleId).emit("message", { type: "text", date, message, messageId: res.id })
-      //  socket.in(from).emit("message", { type: "text", date, message })
-      socket.in(from).emit("sent", res.id)
+      socket.to(to).emit("message", { type: "text", date, message, messageId: res.id, from, to })
+      socket.to(from).emit("sent", res.id)
 
     } catch (error: any) {
       console.log(error)
@@ -119,7 +127,7 @@ couple.on("connection", socket => {
       return
     }
     const date = new Date()
-    const key = from + Date.now() + "." + contentType
+    const key = from + "_" + Date.now() + "." + contentType
     const params = {
       Bucket: "messages",
       Key: key, // File name; to save as in S3
@@ -292,7 +300,7 @@ coupleAndUser.on("connection", socket => {
 
 Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
   io.adapter(createAdapter(pubClient, subClient));
-  io.listen(4000);
+  server.listen(4000);
 }).catch(error => {
   console.log(error)
 });
