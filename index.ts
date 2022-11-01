@@ -74,7 +74,6 @@ couple.use(async (socket, next) => {
         next(new Error("Doesn't have a partner"))
       }
     } catch (error) {
-      console.log(error)
       const err = new Error("Got you");
       next(err);
     }
@@ -106,7 +105,6 @@ couple.on("connection", socket => {
       socket.to(from).emit("sent", res.id)
 
     } catch (error: any) {
-      console.log(error)
       socket.in(from).emit("not-sent", error.message)
     }
   })
@@ -116,7 +114,6 @@ couple.on("connection", socket => {
     const to = partnerId
     const date = new Date()
     const key = from + "_" + Date.now() + ".jpg"
-    console.log(file)
     const params = {
       Bucket: "theone-profile-images",
       Key: key, // File name; to save as in S3
@@ -130,7 +127,6 @@ couple.on("connection", socket => {
         couple.to(from).emit("not-sent", err)
         return
       }
-      console.log(data)
       try {
         const newMessage = new coupleMessageModel({
           date,
@@ -150,10 +146,10 @@ couple.on("connection", socket => {
     })
   })
 
-  socket.on("recieved", async messageId => {
+  socket.on("recieved", async () => {
     try {
-      await coupleMessageModel.findByIdAndUpdate(messageId, { $set: { recieved: true } })
-      socket.to(coupleId).emit("recieved", messageId)
+      const res = await coupleMessageModel.updateMany({ couple_id: coupleId }, { $set: { recieved: true } })
+      socket.to(coupleId).emit("recieved")
     } catch (error) {
       console.log(error)
     }
