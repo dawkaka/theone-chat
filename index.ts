@@ -20,7 +20,6 @@ const io = new Server(server, {
   cors: {
     origin: "http://localhost:3000",
     methods: ["GET", "POST"],
-    allowedHeaders: ["my-custom-header"],
     credentials: true
   }
 });
@@ -101,8 +100,8 @@ couple.on("connection", socket => {
         recieved: false,
       })
       const res = await newMessage.save()
-      socket.to(to).emit("message", { type: "text", date, message, messageId: res.id, from, to })
-      socket.to(from).emit("sent", res.id)
+      socket.to(coupleId).emit("message", { type: "text", date, message, messageId: res.id, from, to })
+      socket.in(from).emit("sent", res.id)
 
     } catch (error: any) {
       socket.in(from).emit("not-sent", error.message)
@@ -138,8 +137,8 @@ couple.on("connection", socket => {
           message: key,
         })
         const res = await newMessage.save()
-        socket.to(to).emit("message", res)
-        socket.to(from).emit("sent", res.id)
+        socket.to(coupleId).emit("message", res)
+        socket.in(from).emit("sent", res.id)
       } catch (error) {
         couple.in(from).emit("not-sent", error)
       }
@@ -156,11 +155,11 @@ couple.on("connection", socket => {
   })
 
   socket.on("typing", () => {
-    socket.to(partnerId).emit("typing")
+    socket.to(coupleId).emit("typing")
   })
 
   socket.on("not-typing", isTyping => {
-    socket.to(partnerId).emit("not-typing")
+    socket.to(coupleId).emit("not-typing")
   })
 
 })
