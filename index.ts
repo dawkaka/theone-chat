@@ -150,7 +150,6 @@ couple.on("connection", socket => {
       const res = await coupleMessageModel.updateMany({ couple_id: coupleId }, { $set: { recieved: true } })
       socket.to(coupleId).emit("recieved")
     } catch (error) {
-      console.log(error)
     }
   })
 
@@ -278,7 +277,6 @@ coupleAndUser.on("connection", socket => {
       await groupMessageModel.findByIdAndUpdate(messageId, { $set: { recieved: true } })
       socket.to(room).emit("recieved", messageId)
     } catch (error) {
-      console.log(error)
     }
   })
 
